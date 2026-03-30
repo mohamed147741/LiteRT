@@ -1,0 +1,56 @@
+name: Build LiteRT in Termux ARM64 with Bazel 7.7.0
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+jobs:
+  build-arm64-termux:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout الكود
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      # 2️⃣ إعداد QEMU لمحاكاة ARM64
+      - name: Set up QEMU for ARM64
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      # 3️⃣ إعداد Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 4️⃣ تشغيل Termux Docker ARM64 وبناء LiteRT
+      - name: Build LiteRT in Termux Docker ARM64
+        run: |
+          docker pull ghcr.io/termux/termux-docker:aarch64
+          docker run --rm -t \
+            --platform linux/arm64 \
+            -v $GITHUB_WORKSPACE:/workspace \
+            -w /workspace \
+            ghcr.io/termux/termux-docker:aarch64 /bin/bash -c "
+              # تحديث الحزم
+              pkg update -y
+              pkg upgrade -y
+
+              # تثبيت الأدوات الأساسية
+              pkg install -y git clang wget unzip openjdk-17 pkg-config
+
+              # تثبيت Bazel 7.7.0 ARM64
+              wget https://github.com/bazelbuild/bazel/releases/download/7.7.0/bazel-7.7.0-linux-arm64
+              chmod +x bazel-7.7.0-linux-arm64
+              mv bazel-7.7.0-linux-arm64 /usr/local/bin/bazel
+
+              # التحقق من Bazel
+              bazel version
+
+              # بناء LiteRT باستخدام Bazel
+              bazel build //:all
+
+              # مثال اختبار (اختياري)
+              # bazel run //examples:hello_world
+            "
