@@ -17,7 +17,7 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      # 3️⃣ تشغيل Docker Termux ARM64
+      # 3️⃣ تشغيل Docker Termux ARM64 مع تحديث mirrors
       - name: Run Termux ARM64 Docker
         run: |
           docker pull termux/termux-docker:aarch64
@@ -28,23 +28,26 @@ jobs:
             termux/termux-docker:aarch64 /bin/bash -c "
               set -e
 
-              # 4️⃣ تحديث الحزم الأساسية
+              echo '### تحديث Termux mirrors ###'
+              # تحديث الـ mirrors إلى mirror صالح عالمي
+              sed -i 's|https://packages-cf.termux.dev/apt/termux-main|https://packages.termux.org/apt/termux-main|g' $PREFIX/etc/apt/sources.list
               pkg update -y
+
+              echo '### تثبيت الأدوات الأساسية ###'
               pkg install -y git wget curl unzip openjdk-17
 
-              # 5️⃣ إضافة TUR repo
+              echo '### إضافة TUR repo ###'
               # ضع هنا رابط السكربت الرسمي أو طريقة TUR لإضافة repo
-              # مثال:
+              # مثال (غير مفعل حاليا):
               # wget https://example.com/tur-repo/install.sh
               # bash install.sh
-
-              # 6️⃣ تثبيت Bazel 7 من TUR repo
+              pkg install -y tur
+              echo '### تثبيت Bazel 7.7.0 من TUR repo ###'
+              # مثال:
               pkg install -y bazel7
-              # تأكد أن اسم الحزمة مطابق لما يوفره TUR repo
-              
-              # 7️⃣ التحقق من Bazel
-              #bazel version || echo 'Bazel not found, تحقق من اسم الحزمة'
+              ln -s $PREFIX/bin/bazel-7.7.1 $PREFIX/bazel 
+              bazel version || echo 'تحقق من اسم الحزمة في TUR repo'
 
-              # 8️⃣ بناء LiteRT
+              echo '### بناء LiteRT مع تخطي الأهداف الفاشلة ###'
               bazel build //... --keep_going
             "
