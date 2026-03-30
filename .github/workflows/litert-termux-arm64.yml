@@ -22,7 +22,7 @@ jobs:
         run: |
           docker pull termux/termux-docker:aarch64
 
-          docker run --rm -t --platform linux/arm64 \
+          docker run -it --platform linux/arm64 termux/termux-docker:aarch64 bash\
             -v $GITHUB_WORKSPACE:/workspace \
             -w /workspace \
             termux/termux-docker:aarch64 /bin/bash -c "
