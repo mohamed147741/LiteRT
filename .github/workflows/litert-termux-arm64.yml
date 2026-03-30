@@ -1,34 +1,50 @@
+
 name: Build LiteRT ARM64 Termux
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   build-arm64-termux:
     runs-on: ubuntu-latest
     steps:
+      # 1️⃣ جلب الكود
       - uses: actions/checkout@v3
 
-      - name: Run Termux Docker
+      # 2️⃣ إعداد QEMU لتشغيل ARM Docker على x86 runner
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # 3️⃣ تشغيل Docker Termux ARM64
+      - name: Run Termux ARM64 Docker
         run: |
           docker pull termux/termux-docker:aarch64
-          docker run --rm -t \
-            --platform linux/arm64 \
+
+          docker run --rm -t --platform linux/arm64 \
             -v $GITHUB_WORKSPACE:/workspace \
             -w /workspace \
             termux/termux-docker:aarch64 /bin/bash -c "
+              set -e
+
+              # 4️⃣ تحديث الحزم الأساسية
               pkg update -y
-              pkg install -y wget git curl
+              pkg install -y git wget curl unzip openjdk-17
+
+              # 5️⃣ إضافة TUR repo
+              # ضع هنا رابط السكربت الرسمي أو طريقة TUR لإضافة repo
+              # مثال:
+              # wget https://example.com/tur-repo/install.sh
+              # bash install.sh
+
+              # 6️⃣ تثبيت Bazel 7 من TUR repo
+              pkg install -y bazel7
+              # تأكد أن اسم الحزمة مطابق لما يوفره TUR repo
               
-              # إضافة TUR repo
-              wget https://example.com/tur-repo/install.sh
-              bash install.sh
-              
-              # تثبيت Bazel 7
-              pkg install -y bazel-7.7.0
-              bazel version
-              
-              # بناء LiteRT
-              bazel build //:litert
+              # 7️⃣ التحقق من Bazel
+              #bazel version || echo 'Bazel not found, تحقق من اسم الحزمة'
+
+              # 8️⃣ بناء LiteRT
+              bazel build //... --keep_going
             "
