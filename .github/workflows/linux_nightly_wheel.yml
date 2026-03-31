@@ -54,12 +54,8 @@ jobs:
         env:
           DOCKER_PYTHON_VERSION: ${{ matrix.python-version }}
           # الأعلام أدناه تعطل LSE وتجبر المترجم على استخدام v8-a الأساسية المتوافقة مع Oppo A57s
-          CUSTOM_BAZEL_FLAGS: >-
-            --config=release_cpu_linux 
-            --copt=-mno-outline-atomics 
-            --linkopt=-mno-outline-atomics 
-            --copt=-march=armv8-a 
-            --linkopt=-march=armv8-a
+          CUSTOM_BAZEL_FLAGS: 
+            "--config=release_cpu_linux --copt=-mno-outline-atomics --linkopt=-mno-outline-atomics --copt=-march=armv8-a --linkopt=-march=armv8-a"
           USE_LOCAL_TF: "false"
           TEST_MANYLINUX_COMPLIANCE: "true"
           BUILD_CONVERTER: ${{ inputs.build_converter }}
