@@ -35,27 +35,23 @@ jobs:
       - name: Set up Docker Buildx  
         uses: docker/setup-buildx-action@v3  
 
-      - name: Set up cache keys  
-        id: cache-keys  
-        shell: bash  
-        run: |  
-          CACHE_MONTH=$(TZ='America/Los_Angeles' date +%Y-%m)  
-          echo "CACHE_KEY=${{ github.workflow }}-qemu-arm64-3.12-$CACHE_MONTH-${{ github.sha }}" >> "$GITHUB_OUTPUT"  
-          echo "BAZEL_OUTPUT_BASE=${HOME}/bazel-output-bases/w-qemu-arm64" >> "$GITHUB_ENV"  
-
       - name: Build and generate wheel  
         env:  
           DOCKER_PYTHON_VERSION: "3.12"
-          # استخدام الرمز >- مع علامات تنصيص مفردة لضمان تمريرها ككتلة نصية واحدة لـ Docker
-          CUSTOM_BAZEL_FLAGS: "--config=release_cpu_linux --copt='-mno-outline-atomics' --linkopt='-mno-outline-atomics' --copt='-march=armv8-a' --linkopt='-march=armv8-a'"
           USE_LOCAL_TF: "false"  
           TEST_MANYLINUX_COMPLIANCE: "true"  
           BUILD_CONVERTER: ${{ inputs.build_converter }}  
+          # تم نقل الأعلام إلى سطر التشغيل مباشرة لحمايتها
         run: |  
-          export NIGHTLY_RELEASE_DATE=$(TZ='America/Los_Angeles' date +%Y%m%d)  
-          chmod +x ci/build_pip_package_with_docker.sh  
-          # تمرير المتغير مع علامات تنصيص إضافية في سطر التنفيذ لضمان سلامته
-          CUSTOM_BAZEL_FLAGS="${{ env.CUSTOM_BAZEL_FLAGS }}" ./ci/build_pip_package_with_docker.sh  
+          export NIGHTLY_RELEASE_DATE=$(TZ='America/Los_Angeles' date +%Y%m%d)
+          
+          # تعريف الأعلام مع هروب دقيق للمسافات
+          FLAGS="--config=release_cpu_linux --copt=-mno-outline-atomics --linkopt=-mno-outline-atomics --copt=-march=armv8-a --linkopt=-march=armv8-a"
+          
+          chmod +x ci/build_pip_package_with_docker.sh
+          
+          # التشغيل مع إجبار الصدفة على اعتبار FLAGS نصاً واحداً
+          CUSTOM_BAZEL_FLAGS="$FLAGS" ./ci/build_pip_package_with_docker.sh  
 
       - name: Upload artifacts  
         uses: actions/upload-artifact@v4  
