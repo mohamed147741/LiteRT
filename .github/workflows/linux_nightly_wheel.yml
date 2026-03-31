@@ -2,6 +2,9 @@
 name: "linux nightly wheel arm64 qemu compatibility"
 
 on:
+  puch:
+  branches:
+    -main
   schedule:
     - cron: "0 6 * * *"
   workflow_dispatch:
