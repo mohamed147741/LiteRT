@@ -3,10 +3,8 @@ name: "linux nightly wheel arm64 qemu compatibility"
 
 on:
   push:
-  branshes:
-    -main
-  schedule:
-    - cron: "0 6 * * *"
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       build_converter:
