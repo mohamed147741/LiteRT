@@ -12,10 +12,6 @@ on:
         default: false
         type: boolean
 
-concurrency:
-  group: ${{ github.workflow }}-nightly
-  cancel-in-progress: true
-
 jobs:
   build_wheels:
     name: "Build Wheels - arm64 (QEMU) - Python 3.12"
@@ -36,22 +32,33 @@ jobs:
         uses: docker/setup-buildx-action@v3  
 
       - name: Build and generate wheel  
-        env:  
-          DOCKER_PYTHON_VERSION: "3.12"
-          USE_LOCAL_TF: "false"  
-          TEST_MANYLINUX_COMPLIANCE: "true"  
-          BUILD_CONVERTER: ${{ inputs.build_converter }}  
-          # تم نقل الأعلام إلى سطر التشغيل مباشرة لحمايتها
         run: |  
           export NIGHTLY_RELEASE_DATE=$(TZ='America/Los_Angeles' date +%Y%m%d)
           
-          # تعريف الأعلام مع هروب دقيق للمسافات
-          FLAGS="--config=release_cpu_linux --copt=-mno-outline-atomics --linkopt=-mno-outline-atomics --copt=-march=armv8-a --linkopt=-march=armv8-a"
+          # الحل النهائي: وضع الأعلام في ملف bazelrc مؤقت بدلاً من تمريرها كـ Flags
+          # هذا يضمن أن Docker لن يرى المسافات أو علامات --copt إطلاقاً
           
+          cat <<EOF > custom_flags.bazelrc
+          build --config=release_cpu_linux
+          build --copt=-mno-outline-atomics
+          build --linkopt=-mno-outline-atomics
+          build --copt=-march=armv8-a
+          build --linkopt=-march=armv8-a
+          EOF
+
           chmod +x ci/build_pip_package_with_docker.sh
           
-          # التشغيل مع إجبار الصدفة على اعتبار FLAGS نصاً واحداً
-          CUSTOM_BAZEL_FLAGS="$FLAGS" ./ci/build_pip_package_with_docker.sh  
+          # نقوم بتمرير مسار الملف إلى السكريبت
+          # السكريبت داخلياً سيقرأ المتغير CUSTOM_BAZEL_FLAGS 
+          # سنقوم بخدعة بسيطة: نمرر العلم --bazelrc ليقرأ الأعلام من ملفنا
+          
+          export DOCKER_PYTHON_VERSION="3.12"
+          export USE_LOCAL_TF="false"
+          export TEST_MANYLINUX_COMPLIANCE="true"
+          export BUILD_CONVERTER="${{ inputs.build_converter }}"
+          export CUSTOM_BAZEL_FLAGS="--bazelrc=/root_dir/custom_flags.bazelrc"
+
+          ./ci/build_pip_package_with_docker.sh  
 
       - name: Upload artifacts  
         uses: actions/upload-artifact@v4  
