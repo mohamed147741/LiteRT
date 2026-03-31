@@ -1,53 +1,78 @@
 
-name: Build LiteRT ARM64 Termux
+name: "linux nightly wheel arm64 qemu compatibility"
 
 on:
-  push:
-    branches: [main]
+  schedule:
+    - cron: "0 6 * * *"
   workflow_dispatch:
+    inputs:
+      build_converter:
+        description: 'When true, build the converter into the wheels.'
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: ${{ github.workflow }}-nightly
+  cancel-in-progress: true
 
 jobs:
-  build-arm64-termux:
-    runs-on: ubuntu-latest
-    steps:
-      # 1️⃣ جلب الكود
-      - uses: actions/checkout@v3
+  build_wheels:
+    name: "Build Wheels - arm64 (QEMU) - Python ${{ matrix.python-version }}"
+    # استخدام البيئة الافتراضية للحسابات المجانية
+    runs-on: ubuntu-latest 
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
 
-      # 2️⃣ إعداد QEMU لتشغيل ARM Docker على x86 runner
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      # إعداد QEMU لمحاكاة معمارية arm64 على بيئة x86_64
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
 
-      # 3️⃣ تشغيل Docker Termux ARM64 مع تحديث mirrors
-      - name: Run Termux ARM64 Docker
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up cache keys
+        id: cache-keys
+        shell: bash
         run: |
-          docker pull termux/termux-docker:aarch64
+          CACHE_MONTH=$(TZ='America/Los_Angeles' date +%Y-%m)
+          echo "CACHE_KEY=${{ github.workflow }}-qemu-arm64-${{ matrix.python-version }}-$CACHE_MONTH-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "BAZEL_OUTPUT_BASE=${HOME}/bazel-output-bases/w-qemu-arm64" >> "$GITHUB_ENV"
 
-          docker run -it --platform linux/arm64 termux/termux-docker:aarch64 bash\
-            -v $GITHUB_WORKSPACE:/workspace \
-            -w /workspace \
-            termux/termux-docker:aarch64 /bin/bash -c "
-              set -e
+      - name: Build and generate wheel
+        env:
+          DOCKER_PYTHON_VERSION: ${{ matrix.python-version }}
+          # الأعلام أدناه تعطل LSE وتجبر المترجم على استخدام v8-a الأساسية المتوافقة مع Oppo A57s
+          CUSTOM_BAZEL_FLAGS: >-
+            --config=release_cpu_linux 
+            --copt=-mno-outline-atomics 
+            --linkopt=-mno-outline-atomics 
+            --copt=-march=armv8-a 
+            --linkopt=-march=armv8-a
+          USE_LOCAL_TF: "false"
+          TEST_MANYLINUX_COMPLIANCE: "true"
+          BUILD_CONVERTER: ${{ inputs.build_converter }}
+        run: |
+          export NIGHTLY_RELEASE_DATE=$(TZ='America/Los_Angeles' date +%Y%m%d)
+          chmod +x ci/build_pip_package_with_docker.sh
+          # السكربت سيعمل الآن داخل حاوية arm64 بفضل QEMU
+          ./ci/build_pip_package_with_docker.sh
 
-              echo '### تحديث Termux mirrors ###'
-              # تحديث الـ mirrors إلى mirror صالح عالمي
-              sed -i 's|https://packages-cf.termux.dev/apt/termux-main|https://packages.termux.org/apt/termux-main|g' $PREFIX/etc/apt/sources.list
-              pkg update -y
-
-              echo '### تثبيت الأدوات الأساسية ###'
-              pkg install -y git wget curl unzip openjdk-17
-
-              echo '### إضافة TUR repo ###'
-              # ضع هنا رابط السكربت الرسمي أو طريقة TUR لإضافة repo
-              # مثال (غير مفعل حاليا):
-              # wget https://example.com/tur-repo/install.sh
-              # bash install.sh
-              pkg install -y tur
-              echo '### تثبيت Bazel 7.7.0 من TUR repo ###'
-              # مثال:
-              pkg install -y bazel7
-              ln -s $PREFIX/bin/bazel-7.7.1 $PREFIX/bazel 
-              bazel version || echo 'تحقق من اسم الحزمة في TUR repo'
-
-              echo '### بناء LiteRT مع تخطي الأهداف الفاشلة ###'
-              bazel build //... --keep_going
-            "
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lite-rt-oppo-a57s-compat-py${{ matrix.python-version }}
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+          retention-days: 7
