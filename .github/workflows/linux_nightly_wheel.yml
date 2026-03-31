@@ -1,3 +1,4 @@
+
 name: "linux nightly wheel arm64 qemu compatibility (Python 3.12)"
 
 on:
@@ -20,11 +21,6 @@ jobs:
   build_wheels:
     name: "Build Wheels - arm64 (QEMU) - Python 3.12"
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      # تم إبقاء المصفوفة ولكن بإصدار واحد فقط بناءً على طلبك
-      matrix:
-        python-version: ["3.12"]
 
     steps:  
       - name: Checkout code  
@@ -46,12 +42,12 @@ jobs:
         run: |  
           CACHE_MONTH=$(TZ='America/Los_Angeles' date +%Y-%m)  
           echo "CACHE_KEY=${{ github.workflow }}-qemu-arm64-3.12-$CACHE_MONTH-${{ github.sha }}" >> "$GITHUB_OUTPUT"  
-          echo "BAZEL_OUTPUT_BASE=${HOME}/bazel-output-bases/w-qemu-arm64" >> "$ENV"  
+          # الإصلاح هنا: تم تغيير $ENV إلى $GITHUB_ENV
+          echo "BAZEL_OUTPUT_BASE=${HOME}/bazel-output-bases/w-qemu-arm64" >> "$GITHUB_ENV"  
 
       - name: Build and generate wheel  
         env:  
           DOCKER_PYTHON_VERSION: "3.12"
-          # تم دمج الأعلام في سطر واحد مع علامات تنصيص لضمان عدم حدوث خطأ "unknown flag" في Docker
           CUSTOM_BAZEL_FLAGS: "--config=release_cpu_linux --copt=-mno-outline-atomics --linkopt=-mno-outline-atomics --copt=-march=armv8-a --linkopt=-march=armv8-a"
           USE_LOCAL_TF: "false"  
           TEST_MANYLINUX_COMPLIANCE: "true"  
